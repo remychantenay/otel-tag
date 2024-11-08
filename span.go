@@ -9,10 +9,15 @@ import (
 	"github.com/remychantenay/otel-tag/internal"
 )
 
-// SpanAttributes takes in a struct and spits out OpenTelemetry span attributes
+// SpanAttributes takes in a struct and spits out OpenTelemetry span attributes ([attribute.KeyValue])
 // based on the struct tags.
 func SpanAttributes(res any) []attribute.KeyValue {
-	structValue := reflect.ValueOf(res)
+	return structToAttributes(res)
+}
+
+// structToAttributes returns a slice of [attribute.KeyValue] for a struct.
+func structToAttributes(s any) []attribute.KeyValue {
+	structValue := reflect.ValueOf(s)
 	structType := structValue.Type()
 	fieldCount := structValue.NumField()
 
@@ -22,28 +27,46 @@ func SpanAttributes(res any) []attribute.KeyValue {
 
 	attrs := make([]attribute.KeyValue, 0, fieldCount)
 	for i := 0; i < fieldCount; i++ {
-		tag := internal.ExtractTag(structValue, i)
-
-		if len(tag) == 0 || tag == valIgnore {
-			continue
-		}
-
-		var omitEmpty bool
-		before, after, found := strings.Cut(tag, ",")
-		if found {
-			tag = before
-			if after == valOmitEmpty {
-				omitEmpty = true
+		field, fieldValue := structType.Field(i), structValue.Field(i)
+		if field.Type.Kind() == reflect.Struct {
+			attrs = append(attrs, structToAttributes(fieldValue.Interface())...)
+		} else if field.Type.Kind() == reflect.Pointer { // Known shortcoming, assuming a pointer can only be a struct.
+			attrs = append(attrs, structToAttributes(fieldValue.Elem().Interface())...)
+		} else {
+			attr := basicTypeToAttribute(structType, structValue, i)
+			if !attr.Valid() {
+				continue
 			}
-		}
 
-		field, value := structType.Field(i), structValue.Field(i)
-
-		attr, zeroValue := internal.OTelAttribute(field, value, tag)
-		if !zeroValue || !omitEmpty {
 			attrs = append(attrs, attr)
 		}
 	}
 
 	return attrs
+}
+
+// basicTypeToAttribute returns an [attribute.KeyValue] for a basic type.
+func basicTypeToAttribute(structType reflect.Type, structValue reflect.Value, index int) attribute.KeyValue {
+	tag := internal.ExtractTag(structValue, index)
+
+	if tag == "" {
+		return attribute.KeyValue{}
+	}
+
+	var omitEmpty bool
+	before, after, found := strings.Cut(tag, ",")
+	if found {
+		tag = before
+		if after == flagOmitEmpty {
+			omitEmpty = true
+		}
+	}
+
+	field, fieldValue := structType.Field(index), structValue.Field(index)
+	attr, zeroValue := internal.SpanAttribute(field, fieldValue, tag)
+	if zeroValue && omitEmpty {
+		return attribute.KeyValue{}
+	}
+
+	return attr
 }

@@ -4,11 +4,12 @@ import (
 	"context"
 	"testing"
 
-	oteltag "github.com/remychantenay/otel-tag"
 	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
+
+	oteltag "github.com/remychantenay/otel-tag"
 )
 
 var (
@@ -34,18 +35,16 @@ func BenchmarkSpanAttributes_With(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			m := model{
+			m := testModel{
 				ValStr:          "a_string",
 				ValInt:          42,
 				ValInt64:        42000000000,
-				ValFloat32:      3.14,
 				ValFloat64:      99.718281828,
 				ValBool:         true,
 				ValStrSlice:     []string{"a_string_1", "a_string_2", "a_string_3"},
 				ValIntSlice:     []int{1, 2, 3},
 				ValInt64Slice:   []int64{100000, 200000, 300000},
-				ValFloat32Slice: []float32{1.1, 2.2, 3.3},
-				ValFloat64Slice: []float64{4.4, 5.5, 6.6},
+				ValFloat64Slice: []float64{1.1, 2.2, 3.3},
 				ValBoolSlice:    []bool{true, false, true, false},
 			}
 
