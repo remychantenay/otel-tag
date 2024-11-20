@@ -28,9 +28,9 @@ func structToAttributes(s any) []attribute.KeyValue {
 	attrs := make([]attribute.KeyValue, 0, fieldCount)
 	for i := 0; i < fieldCount; i++ {
 		field, fieldValue := structType.Field(i), structValue.Field(i)
-		if field.Type.Kind() == reflect.Struct {
+		if field.Type.Kind() == reflect.Struct && fieldValue.IsValid() {
 			attrs = append(attrs, structToAttributes(fieldValue.Interface())...)
-		} else if field.Type.Kind() == reflect.Pointer { // Known shortcoming, assuming a pointer can only be a struct.
+		} else if field.Type.Kind() == reflect.Pointer && fieldValue.IsValid() { // Known shortcoming, assuming a pointer can only be a struct.
 			attrs = append(attrs, structToAttributes(fieldValue.Elem().Interface())...)
 		} else {
 			attr := basicTypeToAttribute(structType, structValue, i)
