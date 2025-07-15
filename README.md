@@ -14,6 +14,7 @@ package main
 import (
 	"context"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/trace"
 
@@ -34,14 +35,26 @@ type UserDetails struct {
 }
 
 func main() {
+	tracer := otel.Tracer("example")
+	
+	user := User{
+		ID:        "123",
+		Username:  "john_doe",
+		IsPremium: true,
+		UserDetails: UserDetails{
+			Website: "https://example.com",
+			Bio:     "Software developer",
+		},
+	}
+
 	// Span attributes.
 	_, span := tracer.Start(context.Background(), "someOperation",
-		trace.WithAttributes(oteltag.SpanAttributes(m)...),
+		trace.WithAttributes(oteltag.SpanAttributes(user)...),
 	)
 	defer span.End()
 
 	// Baggage Members.
-	members := oteltag.BaggageMembers(m)
+	members := oteltag.BaggageMembers(user)
 	bag, _ := baggage.New(members...)
 	ctx := baggage.ContextWithBaggage(context.Background(), bag)
 }
