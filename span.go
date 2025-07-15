@@ -19,8 +19,22 @@ func SpanAttributes(res any) []attribute.KeyValue {
 func structToAttributes(s any) []attribute.KeyValue {
 	structValue := reflect.ValueOf(s)
 	structType := structValue.Type()
-	fieldCount := structValue.NumField()
 
+	// Handle pointer to struct
+	if structType.Kind() == reflect.Pointer {
+		if structValue.IsNil() {
+			return nil
+		}
+		structValue = structValue.Elem()
+		structType = structValue.Type()
+	}
+
+	// Validate input is a struct
+	if structType.Kind() != reflect.Struct {
+		return nil
+	}
+
+	fieldCount := structValue.NumField()
 	if fieldCount == 0 {
 		return nil
 	}
@@ -30,7 +44,7 @@ func structToAttributes(s any) []attribute.KeyValue {
 		field, fieldValue := structType.Field(i), structValue.Field(i)
 		if field.Type.Kind() == reflect.Struct && fieldValue.IsValid() {
 			attrs = append(attrs, structToAttributes(fieldValue.Interface())...)
-		} else if field.Type.Kind() == reflect.Pointer && fieldValue.IsValid() { // Known shortcoming, assuming a pointer can only be a struct.
+		} else if field.Type.Kind() == reflect.Pointer && fieldValue.IsValid() && !fieldValue.IsNil() { // Known shortcoming, assuming a pointer can only be a struct.
 			attrs = append(attrs, structToAttributes(fieldValue.Elem().Interface())...)
 		} else {
 			attr := basicTypeToAttribute(structType, structValue, i)

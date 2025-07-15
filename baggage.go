@@ -19,8 +19,22 @@ func BaggageMembers(res any) []baggage.Member {
 func structToBaggageMembers(s any) []baggage.Member {
 	structValue := reflect.ValueOf(s)
 	structType := structValue.Type()
-	fieldCount := structValue.NumField()
 
+	// Handle pointer to struct
+	if structType.Kind() == reflect.Pointer {
+		if structValue.IsNil() {
+			return nil
+		}
+		structValue = structValue.Elem()
+		structType = structValue.Type()
+	}
+
+	// Validate input is a struct
+	if structType.Kind() != reflect.Struct {
+		return nil
+	}
+
+	fieldCount := structValue.NumField()
 	if fieldCount == 0 {
 		return nil
 	}
@@ -30,7 +44,7 @@ func structToBaggageMembers(s any) []baggage.Member {
 		field, fieldValue := structType.Field(i), structValue.Field(i)
 		if field.Type.Kind() == reflect.Struct && fieldValue.IsValid() {
 			members = append(members, structToBaggageMembers(fieldValue.Interface())...)
-		} else if field.Type.Kind() == reflect.Pointer && fieldValue.IsValid() { // Known shortcoming, assuming a pointer can only be a struct.
+		} else if field.Type.Kind() == reflect.Pointer && fieldValue.IsValid() && !fieldValue.IsNil() { // Known shortcoming, assuming a pointer can only be a struct.
 			members = append(members, structToBaggageMembers(fieldValue.Elem().Interface())...)
 		} else {
 			member := basicTypeToBaggageMember(structType, structValue, i)
