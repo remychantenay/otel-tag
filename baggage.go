@@ -10,26 +10,12 @@ import (
 )
 
 // BaggageMembers takes in a struct and spits out OpenTelemetry baggage members
-// based on the struct tags.
+// based on the struct tags. Only basic types are supported: string, int, int64, float64, bool,
+// and slices of these types. Nested structs and pointers are ignored.
 func BaggageMembers(res any) []baggage.Member {
-	return structToBaggageMembers(res)
-}
-
-// structToBaggageMembers returns a slice of [baggage.Member] for a struct.
-func structToBaggageMembers(s any) []baggage.Member {
-	structValue := reflect.ValueOf(s)
+	structValue := reflect.ValueOf(res)
 	structType := structValue.Type()
 
-	// Handle pointer to struct
-	if structType.Kind() == reflect.Pointer {
-		if structValue.IsNil() {
-			return nil
-		}
-		structValue = structValue.Elem()
-		structType = structValue.Type()
-	}
-
-	// Validate input is a struct
 	if structType.Kind() != reflect.Struct {
 		return nil
 	}
@@ -40,20 +26,13 @@ func structToBaggageMembers(s any) []baggage.Member {
 	}
 
 	members := make([]baggage.Member, 0, fieldCount)
-	for i := 0; i < fieldCount; i++ {
-		field, fieldValue := structType.Field(i), structValue.Field(i)
-		if field.Type.Kind() == reflect.Struct && fieldValue.IsValid() {
-			members = append(members, structToBaggageMembers(fieldValue.Interface())...)
-		} else if field.Type.Kind() == reflect.Pointer && fieldValue.IsValid() && !fieldValue.IsNil() { // Known shortcoming, assuming a pointer can only be a struct.
-			members = append(members, structToBaggageMembers(fieldValue.Elem().Interface())...)
-		} else {
-			member := basicTypeToBaggageMember(structType, structValue, i)
-			if member.Key() == "" {
-				continue
-			}
-
-			members = append(members, member)
+	for i := range fieldCount {
+		member := basicTypeToBaggageMember(structType, structValue, i)
+		if member.Key() == "" {
+			continue
 		}
+
+		members = append(members, member)
 	}
 
 	return members
