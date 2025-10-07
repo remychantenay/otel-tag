@@ -10,26 +10,12 @@ import (
 )
 
 // SpanAttributes takes in a struct and spits out OpenTelemetry span attributes ([attribute.KeyValue])
-// based on the struct tags.
+// based on the struct tags. Only basic types are supported: string, int, int64, float64, bool,
+// and slices of these types. Nested structs and pointers are ignored.
 func SpanAttributes(res any) []attribute.KeyValue {
-	return structToAttributes(res)
-}
-
-// structToAttributes returns a slice of [attribute.KeyValue] for a struct.
-func structToAttributes(s any) []attribute.KeyValue {
-	structValue := reflect.ValueOf(s)
+	structValue := reflect.ValueOf(res)
 	structType := structValue.Type()
 
-	// Handle pointer to struct
-	if structType.Kind() == reflect.Pointer {
-		if structValue.IsNil() {
-			return nil
-		}
-		structValue = structValue.Elem()
-		structType = structValue.Type()
-	}
-
-	// Validate input is a struct
 	if structType.Kind() != reflect.Struct {
 		return nil
 	}
@@ -40,20 +26,13 @@ func structToAttributes(s any) []attribute.KeyValue {
 	}
 
 	attrs := make([]attribute.KeyValue, 0, fieldCount)
-	for i := 0; i < fieldCount; i++ {
-		field, fieldValue := structType.Field(i), structValue.Field(i)
-		if field.Type.Kind() == reflect.Struct && fieldValue.IsValid() {
-			attrs = append(attrs, structToAttributes(fieldValue.Interface())...)
-		} else if field.Type.Kind() == reflect.Pointer && fieldValue.IsValid() && !fieldValue.IsNil() { // Known shortcoming, assuming a pointer can only be a struct.
-			attrs = append(attrs, structToAttributes(fieldValue.Elem().Interface())...)
-		} else {
-			attr := basicTypeToAttribute(structType, structValue, i)
-			if !attr.Valid() {
-				continue
-			}
-
-			attrs = append(attrs, attr)
+	for i := range fieldCount {
+		attr := basicTypeToAttribute(structType, structValue, i)
+		if !attr.Valid() {
+			continue
 		}
+
+		attrs = append(attrs, attr)
 	}
 
 	return attrs
